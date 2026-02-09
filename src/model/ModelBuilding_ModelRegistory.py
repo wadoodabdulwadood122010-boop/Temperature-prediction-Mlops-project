@@ -7,6 +7,8 @@ from mlflow.tracking import MlflowClient
 import dagshub
 from pathlib import Path
 import os
+import joblib
+
 # Scikit-Learn Models
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, VotingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -17,12 +19,15 @@ from xgboost import XGBRegressor
 # --- CONFIGURATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 INPUT_PATH = BASE_DIR / "data/processed/features.csv"
+# IMPORTANT: Saving as 'weather_rf.pkl' to match your dvc.yaml and evaluation script dependencies
+MODEL_OUTPUT_PATH = BASE_DIR / "models/weather_rf.pkl" 
 
 # MLOps Configuration
 DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 EXPERIMENT_NAME = "Pakistan_Weather_Forecasting"
 REGISTERED_MODEL_NAME = "Pakistan-Weather-Forecast"
+
 # -------------------------------------------------------------------------------------
 # Set up DagsHub credentials for MLflow tracking
 dagshub_token = os.getenv("DAGSHUB_TOCKEN")
@@ -33,14 +38,10 @@ os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
 os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 dagshub_url = "https://dagshub.com"
-repo_owner = "wadoodabdulwadood122010"
-repo_name = "Temperature-prediction-Mlops-project"
-mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+mlflow.set_tracking_uri(f'{dagshub_url}/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
+mlflow.set_experiment(EXPERIMENT_NAME)
+
 # -------------------------------------------------------------------------------------
-# Initialize Connection
-# dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-# mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
-# mlflow.set_experiment(EXPERIMENT_NAME)
 
 def load_and_split_data(filepath):
     if not filepath.exists():
@@ -94,6 +95,12 @@ def train_ensemble():
         )
         ensemble.fit(X_train, y_train)
         print("✅ Training Complete.")
+
+        # --- SAVE MODEL LOCALLY (CRITICAL FIX) ---
+        # This ensures the 'model_evaluation' stage can find the file it expects
+        os.makedirs(MODEL_OUTPUT_PATH.parent, exist_ok=True)
+        joblib.dump(ensemble, MODEL_OUTPUT_PATH)
+        print(f"💾 Saved local model to: {MODEL_OUTPUT_PATH}")
         
         # --- EVALUATION ---
         y_pred = ensemble.predict(X_test)
@@ -102,11 +109,8 @@ def train_ensemble():
         mae, rmse = evaluate_model(y_test, y_pred, model_name="Voting Ensemble")
         
         # --- LOGGING TO MLFLOW ---
-        # Log Metrics
         mlflow.log_metric("mae", mae)
         mlflow.log_metric("rmse", rmse)
-        
-        # Log Parameters (Optional: Log weights or sub-model params)
         mlflow.log_param("model_type", "VotingRegressor_RF_XGB_GB")
         mlflow.log_param("weights", "1, 2, 1")
 
@@ -114,26 +118,32 @@ def train_ensemble():
         print(f"\n📦 Registering model: '{REGISTERED_MODEL_NAME}'...")
         
         # 1. Log the model artifact and register it
-        artifact_path = "model"
-        model_info = mlflow.sklearn.log_model(
+        mlflow.sklearn.log_model(
             sk_model=ensemble,
-            artifact_path=artifact_path,
+            artifact_path="model",
             registered_model_name=REGISTERED_MODEL_NAME
         )
         
         # 2. Promote to "Staging"
         client = MlflowClient()
-        model_version = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["None"])[0].version
-        
-        print(f"🔄 Transitioning version {model_version} to 'Staging'...")
+        # Handle case where version might not be immediately available
+        versions = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["None"])
+        if not versions:
+             # Fallback if specific stage lookup fails or needs refresh
+             versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
+             
+        # Sort to get the absolute latest version created
+        latest_version = sorted(versions, key=lambda x: int(x.version))[-1].version
+
+        print(f"🔄 Transitioning version {latest_version} to 'Staging'...")
         client.transition_model_version_stage(
             name=REGISTERED_MODEL_NAME,
-            version=model_version,
+            version=latest_version,
             stage="Staging",
-            archive_existing_versions=True # Moves old "Staging" models to "Archived"
+            archive_existing_versions=True
         )
         
-        print(f"✅ Success! Model version {model_version} is now in 'Staging'.")
+        print(f"✅ Success! Model version {latest_version} is now in 'Staging'.")
         print("💡 Go to DagsHub > Experiments to see your registered model.")
 
 if __name__ == "__main__":
