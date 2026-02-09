@@ -29,15 +29,17 @@ jobs:
 
       - name: run pipeline
         env:
-          CAPSTONE_TEST: ${{ secrets.DAGSHUB_TOCKEN }}
+          DAGSHUB_TOCKEN: ${{ secrets.DAGSHUB_TOCKEN }}
         run: |
+          git rm -r --cached 'data/'
+          git rm -r --cached 'reports/'
           dvc repro
 
 
       - name: Promote model to production
         if: success()
         env:
-          CAPSTONE_TEST: ${{ secrets.DAGSHUB_TOCKEN }}
+          DAGSHUB_TOCKEN: ${{ secrets.DAGSHUB_TOCKEN }}
         run: python production_grade/model_to_production.py
 
 
