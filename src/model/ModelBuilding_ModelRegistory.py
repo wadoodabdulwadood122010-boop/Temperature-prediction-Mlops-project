@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
-import pickle
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
-import dagshub
-from pathlib import Path
 import os
 import joblib
+from pathlib import Path
 
 # Scikit-Learn Models
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, VotingRegressor
@@ -19,7 +17,7 @@ from xgboost import XGBRegressor
 # --- CONFIGURATION ---
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 INPUT_PATH = BASE_DIR / "data/processed/features.csv"
-# IMPORTANT: Saving as 'weather_rf.pkl' to match your dvc.yaml and evaluation script dependencies
+# IMPORTANT: This filename must match what is defined in your dvc.yaml
 MODEL_OUTPUT_PATH = BASE_DIR / "models/weather_rf.pkl" 
 
 # MLOps Configuration
@@ -84,7 +82,7 @@ def train_ensemble():
         
         # --- DEFINING THE MODELS ---
         rf = RandomForestRegressor(n_estimators=200, max_depth=20, min_samples_split=5, n_jobs=-1, random_state=42)
-        xgb = XGBRegressor(n_estimators=201, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=42)
+        xgb = XGBRegressor(n_estimators=200, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=42)
         gb = GradientBoostingRegressor(n_estimators=150, learning_rate=0.05, max_depth=5, random_state=42)
         
         # --- TRAINING ---
@@ -97,7 +95,7 @@ def train_ensemble():
         print("✅ Training Complete.")
 
         # --- SAVE MODEL LOCALLY (CRITICAL FIX) ---
-        # This ensures the 'model_evaluation' stage can find the file it expects
+        # This creates the models/ directory if missing and saves the file
         os.makedirs(MODEL_OUTPUT_PATH.parent, exist_ok=True)
         joblib.dump(ensemble, MODEL_OUTPUT_PATH)
         print(f"💾 Saved local model to: {MODEL_OUTPUT_PATH}")
@@ -126,13 +124,9 @@ def train_ensemble():
         
         # 2. Promote to "Staging"
         client = MlflowClient()
-        # Handle case where version might not be immediately available
-        versions = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["None"])
-        if not versions:
-             # Fallback if specific stage lookup fails or needs refresh
-             versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
-             
-        # Sort to get the absolute latest version created
+        
+        # Robust way to get the latest version (handling race conditions)
+        versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
         latest_version = sorted(versions, key=lambda x: int(x.version))[-1].version
 
         print(f"🔄 Transitioning version {latest_version} to 'Staging'...")

@@ -23,7 +23,7 @@ MODEL_NAME = "Pakistan-Weather-Forecast"  # Must match the name you used when re
 # dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
 # mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
 # Metric to compare (Change this if you want to optimize for R2 or RMSE)
-METRIC_KEY = "eval_mae" 
+METRIC_KEY = "mae" 
 LOWER_IS_BETTER = True  # Set to True for Error metrics (MAE, RMSE), False for Score metrics (R2, Accuracy)
 
 def get_latest_version(client, model_name, stage):
