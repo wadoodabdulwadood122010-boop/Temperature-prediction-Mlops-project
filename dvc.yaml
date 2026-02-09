@@ -30,8 +30,6 @@ stages:
     deps:
     - data/processed
     - src/model/ModelBuilding_ModelRegistory.py
-    outs:
-    - models/feature_importance.csv
 
   model_evaluation:
     cmd: python src/model/model_evaluation.py
