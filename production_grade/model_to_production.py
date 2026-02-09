@@ -2,26 +2,26 @@ import mlflow
 from mlflow.tracking import MlflowClient
 import dagshub
 import os
-# dagshub_token = os.getenv("CAPSTONE_TEST")
-# if not dagshub_token:
-#     raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
+dagshub_token = os.getenv("DAGSHUB_TOCKEN")
+if not dagshub_token:
+    raise EnvironmentError("DAGSHUB_TOCKEN environment variable is not set")
 
-# os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-# os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
-# dagshub_url = "https://dagshub.com"
-# repo_owner = "vikashdas770"
-# repo_name = "YT-Capstone-Project"
-# mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+dagshub_url = "https://dagshub.com"
+repo_owner = "wadoodabdulwadood122010"
+repo_name = "Temperature-prediction-Mlops-project"
+mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 
 
 
 # --- CONFIGURATION ---
-DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010" 
-DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
+# DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010" 
+# DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 MODEL_NAME = "Pakistan-Weather-Forecast"  # Must match the name you used when registering the model
-dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
+# dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+# mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
 # Metric to compare (Change this if you want to optimize for R2 or RMSE)
 METRIC_KEY = "eval_mae" 
 LOWER_IS_BETTER = True  # Set to True for Error metrics (MAE, RMSE), False for Score metrics (R2, Accuracy)

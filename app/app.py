@@ -11,18 +11,30 @@ import dagshub
 import os
 
 app = Flask(__name__)
+dagshub_token = os.getenv("CAPSTONE_TEST")
+if not dagshub_token:
+    raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
 
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+
+dagshub_url = "https://dagshub.com"
+repo_owner = "vikashdas770"
+repo_name = "YT-Capstone-Project"
+# Set up MLflow tracking URI
+mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+# -------------------------------------------------------------------------
 # --- CONFIGURATION ---
 DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 MODEL_NAME = "Pakistan-Weather-Forecast"
 
 # 1. Initialize DagsHub Connection
-try:
-    dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-    mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
-except Exception as e:
-    print(f"⚠️ DagsHub Init Warning: {e}")
+# try:
+#     dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+#     mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
+# except Exception as e:
+#     print(f"⚠️ DagsHub Init Warning: {e}")
 
 # 2. Define Paths
 ENCODER_PATH = "models/city_encoder.pkl"

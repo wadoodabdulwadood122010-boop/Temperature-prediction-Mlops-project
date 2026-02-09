@@ -25,13 +25,12 @@ stages:
     outs:
     - data/processed
 
-  model_building:
-    cmd: python src/model/model_building.py
+  model_building_and_registoring:
+    cmd: python src/model/ModelBuilding_ModelRegistory.py
     deps:
     - data/processed
-    - src/model/model_building.py
+    - src/model/ModelBuilding_ModelRegistory.py
     outs:
-    - models/weather_rf.pkl
     - models/feature_importance.csv
 
   model_evaluation:
@@ -44,8 +43,4 @@ stages:
     outs:
     - reports/figures  # Add the model_info.json file as an output
 
-  model_registration:
-    cmd: python src/model/model_registory.py
-    deps:
-    - reports/metrics.json
-    - src/model/model_registory.py
+  
