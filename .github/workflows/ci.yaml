@@ -33,6 +33,7 @@ jobs:
         run: |
           git rm -r --cached 'data/'
           git rm -r --cached 'reports/'
+          git rm -r --cached 'models/'
           dvc repro
 
 
