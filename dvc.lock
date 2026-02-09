@@ -1,0 +1,108 @@
+schema: '2.0'
+stages:
+  data_ingestion:
+    cmd: python src/data/data_ingestion.py
+    deps:
+    - path: src/data/data_ingestion.py
+      hash: md5
+      md5: f0041322bcc2b845fe6a161c0caaa501
+      size: 4714
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: 8e8fe9d77dcd569074a3367a33b18a2e.dir
+      size: 3975614
+      nfiles: 1
+  data_preprocessing:
+    cmd: python src/data/data_preprocessing.py
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 8e8fe9d77dcd569074a3367a33b18a2e.dir
+      size: 3975614
+      nfiles: 1
+    - path: src/data/data_preprocessing.py
+      hash: md5
+      md5: 50a25c8da9a8bf4684bf7d02d03b868d
+      size: 3087
+    outs:
+    - path: data/interim
+      hash: md5
+      md5: 393ea014ae9a898a2c6fae66398dad49.dir
+      size: 10661050
+      nfiles: 1
+    - path: models/city_encoder.pkl
+      hash: md5
+      md5: f321b3c2c5b4754f69fb5d9d6531ac23
+      size: 401
+  feature_engineering:
+    cmd: python src/features/feature_engineering.py
+    deps:
+    - path: data/interim
+      hash: md5
+      md5: 393ea014ae9a898a2c6fae66398dad49.dir
+      size: 10661050
+      nfiles: 1
+    - path: src/features/feature_engineering.py
+      hash: md5
+      md5: 810de8500d83df45b1cfa939ac9d906b
+      size: 3872
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 595ea4dcf8466f2c0323d07997b92fee.dir
+      size: 11130049
+      nfiles: 1
+  model_building:
+    cmd: python src/model/model_building.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 595ea4dcf8466f2c0323d07997b92fee.dir
+      size: 11130049
+      nfiles: 1
+    - path: src/model/model_building.py
+      hash: md5
+      md5: f95cae180135e8e29e678d2fd2400fe6
+      size: 4490
+    outs:
+    - path: models/feature_importance.csv
+      hash: md5
+      md5: 29d91c7204400449c6a0076a3d6ed2ef
+      size: 530
+    - path: models/weather_rf.pkl
+      hash: md5
+      md5: 7ef9fe92c25af95162734831a5f013c7
+      size: 235552306
+  model_evaluation:
+    cmd: python src/model/model_evaluation.py
+    deps:
+    - path: models/weather_rf.pkl
+      hash: md5
+      md5: 7ef9fe92c25af95162734831a5f013c7
+      size: 235552306
+    - path: src/model/model_evaluation.py
+      hash: md5
+      md5: ef778b469ea3e1bc46a05385c34d8ad7
+      size: 5117
+    outs:
+    - path: reports/figures
+      hash: md5
+      md5: a7be2844f93deba9f5784a0a1f629ef7.dir
+      size: 172471
+      nfiles: 1
+    - path: reports/metrics.json
+      hash: md5
+      md5: 393a9b742934e7ee06c00fda8213ea97
+      size: 149
+  model_registration:
+    cmd: python src/model/model_registory.py
+    deps:
+    - path: reports/metrics.json
+      hash: md5
+      md5: 393a9b742934e7ee06c00fda8213ea97
+      size: 149
+    - path: src/model/model_registory.py
+      hash: md5
+      md5: 31e92751e3db22af77c7982688648935
+      size: 3713
