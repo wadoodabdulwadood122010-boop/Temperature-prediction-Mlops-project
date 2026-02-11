@@ -23,8 +23,7 @@ MODEL_NAME = "Pakistan-Weather-Forecast"  # Must match the name you used when re
 # dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
 # mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
 # Metric to compare (Change this if you want to optimize for R2 or RMSE)
-METRIC_KEY = "mae"
-METRIC_KEY2 = "eval_mae" 
+METRIC_KEY = "mae" 
 LOWER_IS_BETTER = True  # Set to True for Error metrics (MAE, RMSE), False for Score metrics (R2, Accuracy)
 
 def get_latest_version(client, model_name, stage):
@@ -82,11 +81,6 @@ def promote_to_production():
 
     if staging_metric is None or production_metric is None:
         print(f"❌ Could not find metric '{METRIC_KEY}' in one of the runs. Check your logging.")
-        print(f"Trying {METRIC_KEY2}")
-        staging_metric = staging_run.data.metrics.get(METRIC_KEY2)
-        production_metric = production_run.data.metrics.get(METRIC_KEY2)
-    else:
-        print('❌❌❌❌ Both ways are note working ❌❌❌')
 
 
     print(f"   📉 Staging {METRIC_KEY}: {staging_metric:.4f}")

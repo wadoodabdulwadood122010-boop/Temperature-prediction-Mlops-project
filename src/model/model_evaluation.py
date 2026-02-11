@@ -3,18 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import mlflow
-import mlflow.sklearn
-from mlflow.tracking import MlflowClient
-import dagshub
 import json
+import pickle
 from pathlib import Path
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import os
+
 # --- CONFIGURATION ---
-DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010" 
-DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
-REGISTERED_MODEL_NAME = "Pakistan-Weather-Forecast" # Must match model_building.py
-# Set up DagsHub credentials for MLflow tracking
+# DagsHub/MLflow auth is kept for logging the results, even if loading is local
 dagshub_token = os.getenv("DAGSHUB_TOCKEN")
 if not dagshub_token:
     raise EnvironmentError("DAGSHUB_TOCKEN environment variable is not set")
@@ -26,17 +22,16 @@ dagshub_url = "https://dagshub.com"
 repo_owner = "wadoodabdulwadood122010"
 repo_name = "Temperature-prediction-Mlops-project"
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
-# -------------------------------------------------------------------------------------
-# Initialize DagsHub & MLflow
-# dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-# mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
-# mlflow.set_experiment("MODEL_EVALUATION")
 
 # Define Paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_PATH = BASE_DIR / "data/processed/features.csv"
+# Changed: Path to local pickle model
+MODEL_PATH = BASE_DIR / "models/weather_rf.pkl"  
 IMG_DIR = BASE_DIR / "reports/figures"
+# Changed: Path to local metrics JSON
 METRICS_PATH = BASE_DIR / "reports/metrics.json"
+experiment_name = "Using_votting_regresor"
 
 def load_test_data():
     """Re-creates the test split used during training (2023+ data)."""
@@ -93,28 +88,24 @@ def evaluate():
     X_test, y_test = load_test_data()
     print(f"   Loaded {len(X_test)} test samples.")
 
-    # 2. Load Model from MLflow STAGING
-    # We dynamically fetch whatever is currently in 'Staging'
-    model_uri = f"models:/{REGISTERED_MODEL_NAME}/Staging"
-    print(f"⏳ Downloading 'Staging' model from DagsHub ({model_uri})...")
+    # 2. Load Model from Local Pickle
+    print(f"⏳ Loading model from local path: {MODEL_PATH}...")
     
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"❌ Model file not found at: {MODEL_PATH}")
+
     try:
-        model = mlflow.sklearn.load_model(model_uri)
-        print("✅ Staging Model Loaded Successfully!")
+        with open(MODEL_PATH, "rb") as f:
+            model = pickle.load(f)
+        print("✅ Local Model Loaded Successfully!")
     except Exception as e:
-        print(f"❌ Failed to load model. Ensure a model is in 'Staging'. Error: {e}")
+        print(f"❌ Failed to load local model. Error: {e}")
         return
 
-    # 3. Get Model Version (for logging)
-    client = MlflowClient()
-    latest_version_info = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Staging"])
-    staging_version = latest_version_info[0].version if latest_version_info else "Unknown"
-    print(f"   Evaluating Model Version: {staging_version}")
-
-    # 4. Predict
+    # 3. Predict
     y_pred = model.predict(X_test)
     
-    # 5. Calculate Metrics
+    # 4. Calculate Metrics
     mae = mean_absolute_error(y_test, y_pred)
     rmse = mean_squared_error(y_test, y_pred, squared=False)
     r2 = r2_score(y_test, y_pred)
@@ -124,33 +115,28 @@ def evaluate():
     print(f"      RMSE: {rmse:.4f}")
     print(f"      R2:   {r2:.4f}")
 
-    # 6. Log to MLflow
-    with mlflow.start_run(run_name=f"Eval_Version_{staging_version}") as run:
+    # 5. Save Metrics to JSON (Local)
+    metrics_dict = {
+        "mae": mae,
+        "rmse": rmse,
+        "r2": r2
+    }
+    
+    METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(METRICS_PATH, "w") as f:
+        json.dump(metrics_dict, f, indent=4)
+        
+    print(f"   📄 Metrics saved locally to: {METRICS_PATH}")
+    mlflow.set_experiment(experiment_name)
+    with mlflow.start_run() as run:
         mlflow.log_metric("eval_mae", mae)
         mlflow.log_metric("eval_rmse", rmse)
         mlflow.log_metric("eval_r2", r2)
-        mlflow.log_param("evaluated_version", staging_version)
         
         # Log Plot
         plot_path = plot_residuals(y_test, y_pred)
         mlflow.log_artifact(str(plot_path))
         print(f"   🖼️ Plots logged to DagsHub.")
-
-        # 7. Save Metrics to JSON (Crucial for Next Step)
-        # We save the 'staging_version' so the next script knows WHAT to promote to Production
-        metrics_dict = {
-            "mae": mae,
-            "rmse": rmse,
-            "r2": r2,
-            "staging_version": staging_version,
-            "run_id": run.info.run_id
-        }
-        
-        METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(METRICS_PATH, "w") as f:
-            json.dump(metrics_dict, f, indent=4)
-            
-        print(f"   📄 Metrics & Version Info saved to: {METRICS_PATH}")
 
 if __name__ == "__main__":
     evaluate()
