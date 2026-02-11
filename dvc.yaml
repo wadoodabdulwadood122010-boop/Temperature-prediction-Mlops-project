@@ -29,7 +29,7 @@ stages:
     cmd: python src/model/model_building.py
     deps:
     - data/processed
-    - src/model/ModelBuilding_ModelRegistory.py
+    - src/model/model_building.py
     outs:
     - models/weather_rf.pkl
 
