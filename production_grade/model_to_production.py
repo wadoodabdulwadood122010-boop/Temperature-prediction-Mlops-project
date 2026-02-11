@@ -7,7 +7,10 @@ import sys
 DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 MODEL_NAME = "Pakistan-Weather-Forecast"
-METRIC_KEY = "eval_mae" 
+
+# We now support checking both new and old keys
+METRIC_KEY_NEW = "eval_mae"
+METRIC_KEY_OLD = "mae" 
 LOWER_IS_BETTER = True 
 
 # --- AUTHENTICATION ---
@@ -22,12 +25,6 @@ dagshub_url = "https://dagshub.com"
 mlflow.set_tracking_uri(f'{dagshub_url}/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
 
 def get_latest_version(client, model_name, stage):
-    """
-    Helper to get the latest version of a model in a specific stage.
-    Returns None if no model is found in that stage.
-    """
-    # We fetch all versions and filter manually because MLflow's filter string 
-    # sometimes behaves inconsistently with empty stages.
     try:
         versions = client.get_latest_versions(model_name, stages=[stage])
     except Exception:
@@ -35,9 +32,17 @@ def get_latest_version(client, model_name, stage):
 
     if not versions:
         return None
-        
-    # Return the one with the highest version number
     return max(versions, key=lambda x: int(x.version))
+
+def get_metric_safe(run, key_primary, key_secondary):
+    """
+    Tries to fetch the metric using the primary key. 
+    If not found, tries the secondary (legacy) key.
+    """
+    val = run.data.metrics.get(key_primary)
+    if val is not None:
+        return val
+    return run.data.metrics.get(key_secondary)
 
 def promote_to_production():
     print(f"🚀 Checking models for: {MODEL_NAME}")
@@ -68,7 +73,6 @@ def promote_to_production():
     # --- SCENARIO 3: Both Exist - Compare Metrics ---
     print(f"⚖️ Comparing Staging (v{staging_model.version}) vs Production (v{production_model.version})...")
 
-    # Fetch run data to get metrics
     try:
         staging_run = client.get_run(staging_model.run_id)
         production_run = client.get_run(production_model.run_id)
@@ -76,18 +80,18 @@ def promote_to_production():
         print(f"❌ Error fetching run data: {e}")
         return
 
-    staging_metric = staging_run.data.metrics.get(METRIC_KEY)
-    production_metric = production_run.data.metrics.get(METRIC_KEY)
+    # Use the helper function to handle both 'eval_mae' and 'mae'
+    staging_metric = get_metric_safe(staging_run, METRIC_KEY_NEW, METRIC_KEY_OLD)
+    production_metric = get_metric_safe(production_run, METRIC_KEY_NEW, METRIC_KEY_OLD)
 
-    # --- CRITICAL FIX HERE ---
     if staging_metric is None or production_metric is None:
-        print(f"❌ Could not find metric '{METRIC_KEY}' in one of the runs.")
+        print(f"❌ Could not find metric '{METRIC_KEY_NEW}' or '{METRIC_KEY_OLD}' in one of the runs.")
         print(f"   Staging (v{staging_model.version}) metrics: {staging_run.data.metrics.keys()}")
         print(f"   Prod (v{production_model.version}) metrics: {production_run.data.metrics.keys()}")
-        sys.exit(1) # Stop execution to prevent crash
+        sys.exit(1)
 
-    print(f"   📉 Staging {METRIC_KEY}: {staging_metric:.4f}")
-    print(f"   📉 Prod    {METRIC_KEY}: {production_metric:.4f}")
+    print(f"   📉 Staging MAE: {staging_metric:.4f}")
+    print(f"   📉 Prod    MAE: {production_metric:.4f}")
 
     # Determine which is better
     is_staging_better = False
@@ -96,10 +100,8 @@ def promote_to_production():
     else:
         is_staging_better = staging_metric > production_metric
 
-    # Execute Promotion or Rejection
     if is_staging_better:
         print(f"🎉 Staging model is BETTER! Promoting v{staging_model.version} to Production.")
-        
         client.transition_model_version_stage(
             name=MODEL_NAME,
             version=staging_model.version,
@@ -107,11 +109,9 @@ def promote_to_production():
             archive_existing_versions=True 
         )
         print(f"   Old Production (v{production_model.version}) has been Archived.")
-        
     else:
         print(f"🚫 Staging model is WORSE (or equal). Keeping v{production_model.version} in Production.")
         print(f"   Archiving the rejected Staging model (v{staging_model.version}).")
-        
         client.transition_model_version_stage(
             name=MODEL_NAME,
             version=staging_model.version,
