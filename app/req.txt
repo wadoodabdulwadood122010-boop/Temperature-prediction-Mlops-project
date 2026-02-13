@@ -1,8 +1,9 @@
 Flask
 pandas
 numpy
-openmeteo_requests
+openmeteo-requests
 requests-cache
 retry-requests
 mlflow
 dagshub
+prometheus-client
