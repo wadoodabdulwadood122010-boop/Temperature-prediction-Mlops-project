@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: temprerature-prediction
-        image: 606010182123.dkr.ecr.us-east-1.amazonaws.com/temprerature_prediction:latest
+        image: 606010182123.dkr.ecr.us-east-1.amazonaws.com/my_app:latest
         ports:
         - containerPort: 5000
         resources:
