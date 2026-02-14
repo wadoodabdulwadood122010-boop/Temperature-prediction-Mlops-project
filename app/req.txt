@@ -6,4 +6,5 @@ requests-cache
 retry-requests
 mlflow
 dagshub
+xgboost
 prometheus-client

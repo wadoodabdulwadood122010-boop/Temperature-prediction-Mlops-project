@@ -53,6 +53,7 @@ if not dagshub_token:
 else:
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+    os.environ["DAGSHUB_USER_TOKEN"] = dagshub_token
 
 dagshub_url = "https://dagshub.com"
 repo_owner = "wadoodabdulwadood122010"
@@ -121,7 +122,7 @@ try:
     # 3. Load the model
     model_uri = f"models:/{MODEL_NAME}/{version}"
     print(f"⏳ Downloading model from: {model_uri} ...")
-    model = mlflow.pyfunc.load_model(model_uri)
+    model = mlflow.sklearn.load_model(model_uri)
     print("✅ Model Loaded Successfully!")
 
 except Exception as e:
