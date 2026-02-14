@@ -56,7 +56,7 @@ else:
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
 try:
-    dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+    # dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
     mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
     print("✅ Connected to DagsHub MLflow Tracking")
 except Exception as e:
