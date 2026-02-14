@@ -78,7 +78,7 @@ jobs:
       
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name flask-app-cluster
+          aws eks update-kubeconfig --region us-east-1 --name my-app-cluster
 
       - name: Create Kubernetes Secret
         run: |
