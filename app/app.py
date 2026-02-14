@@ -252,7 +252,15 @@ def predict():
     start_time = time.time()
     city = request.form.get('city')
     
-    # 1. Validate City against Encoder immediately
+    # --- 1. CRITICAL SAFETY CHECK ---
+    # If the model failed to load at startup, stop here immediately.
+    if model is None:
+        REQUEST_COUNT.labels(city=city, status='error_model_missing').inc()
+        return render_template_string(HTML_TEMPLATE, 
+                                      cities=sorted(LOCATIONS.keys()), 
+                                      prediction="System Error: Model failed to load. Please check server logs.")
+
+    # --- 2. Validate City against Encoder ---
     if not city_encoder:
         return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction="Error: Encoder not loaded")
     
@@ -260,7 +268,7 @@ def predict():
         REQUEST_COUNT.labels(city=city, status='error_unknown_city').inc()
         return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction=f"Error: Unknown city '{city}'")
 
-    # 2. Fetch Live Data
+    # --- 3. Fetch Live Data ---
     print(f"Fetching live data for {city}...")
     live_features = get_live_features(city)
     
@@ -268,7 +276,7 @@ def predict():
         REQUEST_COUNT.labels(city=city, status='failure_api').inc()
         return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction="Error fetching weather data")
 
-    # 3. Preprocessing
+    # --- 4. Preprocessing ---
     today = datetime.now()
     
     try:
@@ -303,8 +311,10 @@ def predict():
         if hasattr(model, 'feature_names_in_'):
             input_data = input_data[model.feature_names_in_]
 
-        # 4. Prediction
-        prediction = model.predict(input_data)[0]
+        # --- 5. Prediction ---
+        # The .predict() method returns a numpy array, we need the first value
+        prediction_array = model.predict(input_data)
+        prediction = prediction_array[0]
         
         # Metrics Update
         REQUEST_COUNT.labels(city=city, status='success').inc()
@@ -317,6 +327,5 @@ def predict():
         print(f"Prediction Error: {e}")
         REQUEST_COUNT.labels(city=city, status='error_predict').inc()
         return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction=f"Error: {e}")
-
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
