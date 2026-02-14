@@ -55,17 +55,9 @@ jobs:
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       - name: Build Docker image
+        # Fix: Build it directly with the full ECR path to avoid retagging complexity
         run: |
-            docker build -t ${{ secrets.ECR_REPOSITORY }}:V2 .
-
-      - name: Tag Docker image
-        run: |
-            docker tag ${{ secrets.ECR_REPOSITORY }}:latest \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:V2
-
-    
-      - name: Check Docker Authentication
-        run: docker info
+          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:V2 .
 
       - name: Push Docker image to ECR
         run: |
@@ -74,17 +66,23 @@ jobs:
       - name: Set Up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'V2'
-      
+          version: 'latest' # Fix: 'V2' is likely not a valid kubectl version
+
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --region us-east-1 --name my-app-cluster
 
       - name: Create Kubernetes Secret
+        # (Your existing secret step is fine)
         run: |
           kubectl create secret generic capstone-secret \
             --from-literal=DAGSHUB_TOCKEN=${{ secrets.DAGSHUB_TOCKEN }} --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to EKS
         run: |
+          # 1. Apply the deployment configuration
           kubectl apply -f deployment.yaml
+          
+          # 2. ⚡ CRITICAL FIX: Force Kubernetes to re-pull the V2 image
+          # Since the tag name "V2" didn't change, we must force a restart.
+          kubectl rollout restart deployment temprerature-prediction
