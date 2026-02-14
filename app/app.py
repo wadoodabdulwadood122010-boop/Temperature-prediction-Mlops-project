@@ -54,6 +54,7 @@ if not dagshub_token:
 else:
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+    os.environ["DAGSHUB_USER_TOKEN"] = dagshub_token
 
 try:
     dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
