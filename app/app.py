@@ -45,23 +45,8 @@ PREDICTED_VALUE = Gauge(
 # --- CONFIGURATION ---
 DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
-model_name = "Pakistan-Weather-Forecast"
+MODEL_NAME = "Pakistan-Weather-Forecast"
 
-# --- AUTHENTICATION & CONNECTION ---
-# dagshub_tocken = os.getenv("DAGSHUB_TOCKEN")
-# if not dagshub_tocken:
-#     print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
-# else:
-#     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_tocken
-#     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_tocken
-#     os.environ["DAGSHUB_USER_TOKEN"] = dagshub_tocken
-
-# try:
-#     dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-#     mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
-#     print("✅ Connected to DagsHub MLflow Tracking")
-# except Exception as e:
-#     print(f"⚠️ DagsHub Init Warning: {e}")
 dagshub_token = os.getenv("DAGSHUB_TOCKEN")
 if not dagshub_token:
     print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
@@ -92,26 +77,56 @@ if os.path.exists(ENCODER_PATH):
 else:
     print(f"⚠️ Warning: City encoder not found at {ENCODER_PATH}")
 
-# Load Model from Registry
-# print(f"🔌 Connecting to Model Registry...")
-# try:
-#     print(f"⏳ Downloading '{MODEL_NAME}' (Stage: Production)...")
-#     model_uri = f"models:/{MODEL_NAME}/Production"
-#     model = mlflow.sklearn.load_model(model_uri)
-#     print("✅ Remote Production Model Loaded Successfully!")
-# except Exception as e:
-#     print(f"❌ FAILED to load remote model. Error: {e}")
-def get_latest_model_version(model_name):
+def get_production_model_version(model_name):
+    print(f"🔍 Searching for Production version of: {model_name}")
     client = mlflow.MlflowClient()
-    latest_version = client.get_latest_versions(model_name, stages=["Production"])
-    if not latest_version:
-        latest_version = client.get_latest_versions(model_name, stages=["None"])
-    return latest_version[0].version if latest_version else None
+    
+    # 1. Fetch all versions of this model
+    # search_model_versions returns a list of all versions (1, 2, 3...)
+    all_versions = client.search_model_versions(f"name='{model_name}'")
+    
+    # 2. Loop through and find the one labeled 'Production'
+    production_version = None
+    for v in all_versions:
+        if v.current_stage == "Production":
+            production_version = v
+            break # Stop once we find it
+    
+    if production_version:
+        print(f"✅ Found PRODUCTION model: Version {production_version.version}")
+        return production_version.version
+    else:
+        print(f"⚠️ No 'Production' version found for {model_name}.")
+        return None
 
-model_version = get_latest_model_version(model_name)
-model_uri = f'models:/{model_name}/{model_version}'
-print(f"Fetching model from: {model_uri}")
-model = mlflow.pyfunc.load_model(model_uri)
+# --- LOAD RESOURCES ---
+model = None
+
+# ... (Encoder loading code) ...
+
+# Load Model
+try:
+    # 1. Try to get the Production version
+    version = get_production_model_version(MODEL_NAME)
+    
+    # 2. (Optional) Fallback: If no Production, get the absolute latest
+    if version is None:
+        print("⚠️ Falling back to LATEST version (Use with caution!)...")
+        client = mlflow.MlflowClient()
+        # Get latest version regardless of stage
+        latest = client.get_latest_versions(MODEL_NAME)[0]
+        version = latest.version
+        print(f"ℹ️ Selected Fallback Version: {version} (Stage: {latest.current_stage})")
+
+    # 3. Load the model
+    model_uri = f"models:/{MODEL_NAME}/{version}"
+    print(f"⏳ Downloading model from: {model_uri} ...")
+    model = mlflow.pyfunc.load_model(model_uri)
+    print("✅ Model Loaded Successfully!")
+
+except Exception as e:
+    print(f"❌ Critical Error loading model: {e}")
+    model = None
 # --- WEATHER API SETUP ---
 # UPDATED: Only includes the 15 cities present in your city_encoder.pkl
 LOCATIONS = {
