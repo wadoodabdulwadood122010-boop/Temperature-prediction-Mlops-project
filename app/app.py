@@ -1,21 +1,24 @@
-from flask import Flask, request, render_template_string, Response
-import pandas as pd
-import numpy as np
-import pickle
-import openmeteo_requests
-import requests_cache
-from retry_requests import retry
-from datetime import datetime, timedelta
-import mlflow
-import dagshub
 import os
 import time
+import pickle
+import numpy as np
+import pandas as pd
+import requests_cache
+import openmeteo_requests
+from retry_requests import retry
+from datetime import datetime, timedelta
+from flask import Flask, request, render_template_string, Response
 from dotenv import load_dotenv
+
+import mlflow
+import dagshub
 
 # --- PROMETHEUS IMPORTS ---
 from prometheus_client import Counter, Histogram, generate_latest, Gauge
 
+# Load environment variables
 load_dotenv()
+
 app = Flask(__name__)
 
 # --- PROMETHEUS METRICS DEFINITION ---
@@ -47,27 +50,31 @@ DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 MODEL_NAME = "Pakistan-Weather-Forecast"
 
-dagshub_token = os.getenv("DAGSHUB_TOCKEN")
+# 1. READ THE TOKEN (Using your spelling from GitHub Secrets)
+dagshub_token = os.getenv("DAGSHUB_TOCKEN") 
+
+# 2. CONFIGURE MLFLOW AUTHENTICATION
 if not dagshub_token:
     print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
 else:
-    os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+    # Username must be the repo owner, NOT the token
+    os.environ["MLFLOW_TRACKING_USERNAME"] = DAGSHUB_REPO_OWNER
+    # Password is the token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
     os.environ["DAGSHUB_USER_TOKEN"] = dagshub_token
 
+# Set Tracking URI
 dagshub_url = "https://dagshub.com"
-repo_owner = "wadoodabdulwadood122010"
-repo_name = "Temperature-prediction-Mlops-project"
-# Set up MLflow tracking URI
-mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+mlflow.set_tracking_uri(f'{dagshub_url}/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
+
 # --- PATHS ---
 ENCODER_PATH = "city_encoder.pkl"
 
-# --- LOAD RESOURCES ---
+# --- LOAD RESOURCES (Consolidated) ---
 model = None
 city_encoder = None
 
-# Load Encoder Locally
+# 1. Load Encoder
 if os.path.exists(ENCODER_PATH):
     try:
         with open(ENCODER_PATH, "rb") as f:
@@ -78,58 +85,49 @@ if os.path.exists(ENCODER_PATH):
 else:
     print(f"⚠️ Warning: City encoder not found at {ENCODER_PATH}")
 
-def get_production_model_version(model_name):
-    print(f"🔍 Searching for Production version of: {model_name}")
+# 2. Load Model
+try:
+    print(f"🔍 Connecting to DagsHub to find model: {MODEL_NAME}")
     client = mlflow.MlflowClient()
     
-    # 1. Fetch all versions of this model
-    # search_model_versions returns a list of all versions (1, 2, 3...)
-    all_versions = client.search_model_versions(f"name='{model_name}'")
+    # Fetch all versions of the registered model
+    all_versions = client.search_model_versions(f"name='{MODEL_NAME}'")
     
-    # 2. Loop through and find the one labeled 'Production'
-    production_version = None
+    selected_version = None
+    
+    # Strategy A: Priority - Look for 'Production'
     for v in all_versions:
         if v.current_stage == "Production":
-            production_version = v
-            break # Stop once we find it
-    
-    if production_version:
-        print(f"✅ Found PRODUCTION model: Version {production_version.version}")
-        return production_version.version
+            selected_version = v.version
+            print(f"✅ Found PRODUCTION model: Version {selected_version}")
+            break
+            
+    # Strategy B: Fallback - Look for the latest version if no Production exists
+    if selected_version is None and all_versions:
+        # Sort by version number (descending) to get the true latest
+        all_versions.sort(key=lambda x: int(x.version), reverse=True)
+        selected_version = all_versions[0].version
+        print(f"⚠️ No 'Production' version found. Fallback to LATEST: Version {selected_version}")
+        
+    # Load the model if a version was found
+    if selected_version:
+        model_uri = f"models:/{MODEL_NAME}/{selected_version}"
+        print(f"⏳ Downloading model from: {model_uri} ...")
+        model = mlflow.sklearn.load_model(model_uri)
+        print("✅ Model Loaded Successfully!")
     else:
-        print(f"⚠️ No 'Production' version found for {model_name}.")
-        return None
-
-# --- LOAD RESOURCES ---
-model = None
-
-# ... (Encoder loading code) ...
-
-# Load Model
-try:
-    # 1. Try to get the Production version
-    version = get_production_model_version(MODEL_NAME)
-    
-    # 2. (Optional) Fallback: If no Production, get the absolute latest
-    if version is None:
-        print("⚠️ Falling back to LATEST version (Use with caution!)...")
-        client = mlflow.MlflowClient()
-        # Get latest version regardless of stage
-        latest = client.get_latest_versions(MODEL_NAME)[0]
-        version = latest.version
-        print(f"ℹ️ Selected Fallback Version: {version} (Stage: {latest.current_stage})")
-
-    # 3. Load the model
-    model_uri = f"models:/{MODEL_NAME}/{version}"
-    print(f"⏳ Downloading model from: {model_uri} ...")
-    model = mlflow.sklearn.load_model(model_uri)
-    print("✅ Model Loaded Successfully!")
+        print(f"❌ Critical: No registered versions found for model '{MODEL_NAME}'. Check DagsHub Registry.")
 
 except Exception as e:
     print(f"❌ Critical Error loading model: {e}")
+    # Debug info (do not log the full token in prod)
+    if dagshub_token:
+        print(f"   (Token was present, length: {len(dagshub_token)})")
+    else:
+        print("   (Token was MISSING)")
     model = None
+
 # --- WEATHER API SETUP ---
-# UPDATED: Only includes the 15 cities present in your city_encoder.pkl
 LOCATIONS = {
     "Abbottabad": {"lat": 34.1688, "lon": 73.2215},
     "Bahawalpur": {"lat": 29.3544, "lon": 71.6911},
@@ -213,6 +211,7 @@ HTML_TEMPLATE = """
         button:hover { background-color: #218838; }
         .result { margin-top: 20px; font-size: 24px; font-weight: bold; color: #333; }
         .metrics-link { margin-top: 20px; display: block; color: #007bff; text-decoration: none; }
+        .error { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -232,6 +231,11 @@ HTML_TEMPLATE = """
             Prediction: {{ prediction }}
         </div>
         {% endif %}
+        {% if error %}
+        <div class="result error">
+            {{ error }}
+        </div>
+        {% endif %}
         <a href="/metrics" class="metrics-link">View Metrics</a>
     </div>
 </body>
@@ -240,7 +244,6 @@ HTML_TEMPLATE = """
 
 @app.route('/', methods=['GET'])
 def index():
-    # Sort cities alphabetically for the dropdown
     cities = sorted(LOCATIONS.keys())
     return render_template_string(HTML_TEMPLATE, cities=cities, prediction=None)
 
@@ -253,35 +256,34 @@ def predict():
     start_time = time.time()
     city = request.form.get('city')
     
-    # --- 1. CRITICAL SAFETY CHECK ---
-    # If the model failed to load at startup, stop here immediately.
+    # --- 1. MODEL SAFETY CHECK ---
     if model is None:
         REQUEST_COUNT.labels(city=city, status='error_model_missing').inc()
         return render_template_string(HTML_TEMPLATE, 
                                       cities=sorted(LOCATIONS.keys()), 
-                                      prediction="System Error: Model failed to load. Please check server logs.")
+                                      error="System Error: Model failed to load. Please check server logs.")
 
-    # --- 2. Validate City against Encoder ---
+    # --- 2. VALIDATE CITY ENCODER ---
     if not city_encoder:
-        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction="Error: Encoder not loaded")
+        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), error="Error: City encoder not loaded")
     
     if city not in city_encoder.classes_:
         REQUEST_COUNT.labels(city=city, status='error_unknown_city').inc()
-        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction=f"Error: Unknown city '{city}'")
+        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), error=f"Error: Unknown city '{city}'")
 
-    # --- 3. Fetch Live Data ---
+    # --- 3. FETCH LIVE DATA ---
     print(f"Fetching live data for {city}...")
     live_features = get_live_features(city)
     
     if not live_features:
         REQUEST_COUNT.labels(city=city, status='failure_api').inc()
-        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction="Error fetching weather data")
+        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), error="Error fetching weather data")
 
-    # --- 4. Preprocessing ---
+    # --- 4. PREPROCESSING & PREDICTION ---
     today = datetime.now()
     
     try:
-        # Transform city using the loaded pickle file
+        # Transform city
         city_encoded = city_encoder.transform([city])[0]
         
         # Date Features
@@ -312,12 +314,11 @@ def predict():
         if hasattr(model, 'feature_names_in_'):
             input_data = input_data[model.feature_names_in_]
 
-        # --- 5. Prediction ---
-        # The .predict() method returns a numpy array, we need the first value
+        # Predict
         prediction_array = model.predict(input_data)
         prediction = prediction_array[0]
         
-        # Metrics Update
+        # Update Metrics
         REQUEST_COUNT.labels(city=city, status='success').inc()
         PREDICTION_LATENCY.observe(time.time() - start_time)
         PREDICTED_VALUE.labels(city=city).set(prediction)
@@ -327,6 +328,7 @@ def predict():
     except Exception as e:
         print(f"Prediction Error: {e}")
         REQUEST_COUNT.labels(city=city, status='error_predict').inc()
-        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction=f"Error: {e}")
+        return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), error=f"Prediction Error: {e}")
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
