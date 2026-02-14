@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temprerature-prediction # Recommendation: Use hyphens here too for consistency
+  labels:
+    app: temprerature_prediction # Labels CAN have underscores, so this is fine
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temprerature_prediction
+  template:
+    metadata:
+      labels:
+        app: temprerature_prediction
+    spec:
+      containers:
+      - name: temprerature-prediction
+        image: 606010182123.dkr.ecr.us-east-1.amazonaws.com/temprerature_prediction:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+        env:
+        - name: DAGSHUB_TOCKEN
+          valueFrom:
+            secretKeyRef:
+              name: capstone-secret
+              key: DAGSHUB_TOCKEN
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # FIXED: Changed underscores to hyphens. 
+  # Service names MUST be valid DNS labels (no underscores allowed).
+  name: temprerature-prediction-services 
+spec:
+  type: LoadBalancer
+  selector:
+    app: temprerature_prediction # This correctly matches the deployment now!
+  ports:
+    - name: http
+      protocol: TCP
+      port: 5000
+      targetPort: 5000
