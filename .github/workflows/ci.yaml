@@ -83,7 +83,7 @@ jobs:
       - name: Create Kubernetes Secret
         run: |
           kubectl create secret generic capstone-secret \
-            --from-literal=CAPSTONE_TEST=${{ secrets.DAGSHUB_TOCKEN }} --dry-run=client -o yaml | kubectl apply -f -
+            --from-literal=DAGSHUB_TOCKEN=${{ secrets.DAGSHUB_TOCKEN }} --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to EKS
         run: |

@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: temprerature-prediction # Recommendation: Use hyphens here too for consistency
+  name: temprerature-prediction
   labels:
-    app: temprerature_prediction # Labels CAN have underscores, so this is fine
+    app: temprerature_prediction
 spec:
   replicas: 2
   selector:
@@ -27,23 +27,26 @@ spec:
             memory: "512Mi"
             cpu: "1"
         env:
-        - name: DAGSHUB_TOCKEN
+        - name: DAGSHUB_TOCKEN 
           valueFrom:
             secretKeyRef:
               name: capstone-secret
               key: DAGSHUB_TOCKEN
+        - name: DAGSHUB_REPO_OWNER
+          value: "wadoodabdulwadood122010"
+        - name: DAGSHUB_REPO_NAME
+          value: "Temperature-prediction-Mlops-project"
+        
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  # FIXED: Changed underscores to hyphens. 
-  # Service names MUST be valid DNS labels (no underscores allowed).
   name: temprerature-prediction-services 
 spec:
   type: LoadBalancer
   selector:
-    app: temprerature_prediction # This correctly matches the deployment now!
+    app: temprerature_prediction 
   ports:
     - name: http
       protocol: TCP
