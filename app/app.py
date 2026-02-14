@@ -48,9 +48,9 @@ DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
 MODEL_NAME = "Pakistan-Weather-Forecast"
 
 # --- AUTHENTICATION & CONNECTION ---
-dagshub_token = os.getenv("DAGSHUB_TOKEN")
+dagshub_token = os.getenv("DAGSHUB_TOCKEN")
 if not dagshub_token:
-    print("⚠️ WARNING: DAGSHUB_TOKEN not found. Remote model loading might fail.")
+    print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
 else:
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
