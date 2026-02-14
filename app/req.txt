@@ -8,3 +8,4 @@ mlflow
 dagshub
 xgboost
 prometheus-client
+dotenv

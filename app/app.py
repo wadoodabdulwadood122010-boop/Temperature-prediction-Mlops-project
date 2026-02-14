@@ -8,8 +8,6 @@ import openmeteo_requests
 from retry_requests import retry
 from datetime import datetime, timedelta
 from flask import Flask, request, render_template_string, Response
-from dotenv import load_dotenv
-
 import mlflow
 import dagshub
 
@@ -17,7 +15,6 @@ import dagshub
 from prometheus_client import Counter, Histogram, generate_latest, Gauge
 
 # Load environment variables
-load_dotenv()
 
 app = Flask(__name__)
 
