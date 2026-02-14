@@ -45,23 +45,35 @@ PREDICTED_VALUE = Gauge(
 # --- CONFIGURATION ---
 DAGSHUB_REPO_OWNER = "wadoodabdulwadood122010"
 DAGSHUB_REPO_NAME = "Temperature-prediction-Mlops-project"
-MODEL_NAME = "Pakistan-Weather-Forecast"
+model_name = "Pakistan-Weather-Forecast"
 
 # --- AUTHENTICATION & CONNECTION ---
+# dagshub_tocken = os.getenv("DAGSHUB_TOCKEN")
+# if not dagshub_tocken:
+#     print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
+# else:
+#     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_tocken
+#     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_tocken
+#     os.environ["DAGSHUB_USER_TOKEN"] = dagshub_tocken
+
+# try:
+#     dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+#     mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
+#     print("✅ Connected to DagsHub MLflow Tracking")
+# except Exception as e:
+#     print(f"⚠️ DagsHub Init Warning: {e}")
 dagshub_token = os.getenv("DAGSHUB_TOCKEN")
 if not dagshub_token:
-    print("⚠️ WARNING: DAGSHUB_TOCKEN not found. Remote model loading might fail.")
-else:
-    os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+    raise EnvironmentError("DAGSHUB_TOCKEN environment variable is not set")
 
-try:
-    dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
-    mlflow.set_tracking_uri(f'https://dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow')
-    print("✅ Connected to DagsHub MLflow Tracking")
-except Exception as e:
-    print(f"⚠️ DagsHub Init Warning: {e}")
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
+dagshub_url = "https://dagshub.com"
+repo_owner = "wadoodabdulwadood122010"
+repo_name = "Temperature-prediction-Mlops-project"
+# Set up MLflow tracking URI
+mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 # --- PATHS ---
 ENCODER_PATH = "city_encoder.pkl"
 
@@ -81,15 +93,25 @@ else:
     print(f"⚠️ Warning: City encoder not found at {ENCODER_PATH}")
 
 # Load Model from Registry
-print(f"🔌 Connecting to Model Registry...")
-try:
-    print(f"⏳ Downloading '{MODEL_NAME}' (Stage: Production)...")
-    model_uri = f"models:/{MODEL_NAME}/Production"
-    model = mlflow.sklearn.load_model(model_uri)
-    print("✅ Remote Production Model Loaded Successfully!")
-except Exception as e:
-    print(f"❌ FAILED to load remote model. Error: {e}")
+# print(f"🔌 Connecting to Model Registry...")
+# try:
+#     print(f"⏳ Downloading '{MODEL_NAME}' (Stage: Production)...")
+#     model_uri = f"models:/{MODEL_NAME}/Production"
+#     model = mlflow.sklearn.load_model(model_uri)
+#     print("✅ Remote Production Model Loaded Successfully!")
+# except Exception as e:
+#     print(f"❌ FAILED to load remote model. Error: {e}")
+def get_latest_model_version(model_name):
+    client = mlflow.MlflowClient()
+    latest_version = client.get_latest_versions(model_name, stages=["Production"])
+    if not latest_version:
+        latest_version = client.get_latest_versions(model_name, stages=["None"])
+    return latest_version[0].version if latest_version else None
 
+model_version = get_latest_model_version(model_name)
+model_uri = f'models:/{model_name}/{model_version}'
+print(f"Fetching model from: {model_uri}")
+model = mlflow.pyfunc.load_model(model_uri)
 # --- WEATHER API SETUP ---
 # UPDATED: Only includes the 15 cities present in your city_encoder.pkl
 LOCATIONS = {
