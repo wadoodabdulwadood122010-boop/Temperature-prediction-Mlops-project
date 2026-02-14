@@ -281,5 +281,5 @@ def predict():
         REQUEST_COUNT.labels(city=city, status='error_predict').inc()
         return render_template_string(HTML_TEMPLATE, cities=sorted(LOCATIONS.keys()), prediction=f"Error: {e}")
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
