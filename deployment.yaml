@@ -3,16 +3,16 @@ kind: Deployment
 metadata:
   name: temprerature-prediction
   labels:
-    app: temprerature_prediction
+    app: my_app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: temprerature_prediction
+      app: my_app
   template:
     metadata:
       labels:
-        app: temprerature_prediction
+        app: my_app
     spec:
       containers:
       - name: temprerature-prediction
@@ -21,11 +21,11 @@ spec:
         - containerPort: 5000
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "1"
+            memory: "256Mi"
+            cpu: "250m"
           limits:
-            memory: "2Gi"
-            cpu: "2"
+            memory: "512Mi"
+            cpu: "1"
         env:
         - name: DAGSHUB_TOCKEN 
           valueFrom:
@@ -46,7 +46,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: temprerature_prediction 
+    app: my_app 
   ports:
     - name: http
       protocol: TCP
