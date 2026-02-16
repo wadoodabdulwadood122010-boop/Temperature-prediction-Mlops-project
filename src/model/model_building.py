@@ -54,8 +54,8 @@ def train_ensemble():
     X_train, y_train, X_test, y_test, features = load_and_split_data(INPUT_PATH)
     
     # 2. Define Models
-    rf = RandomForestRegressor(n_estimators=200, max_depth=20, min_samples_split=5, n_jobs=-1, random_state=42)
-    xgb = XGBRegressor(n_estimators=200, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=42)
+    rf = RandomForestRegressor(n_estimators=220, max_depth=20, min_samples_split=5, n_jobs=-1, random_state=42)
+    xgb = XGBRegressor(n_estimators=220, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, n_jobs=-1, random_state=42)
     gb = GradientBoostingRegressor(n_estimators=150, learning_rate=0.05, max_depth=5, random_state=42)
     
     # 3. Train Ensemble
